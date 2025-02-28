@@ -18,6 +18,15 @@ const fs = require("fs");
 const configDir = app.getPath("userData");
 const dirPath = path.join(configDir, "uploads");
 const packageJson = require("./package.json");
+// For auto-update
+const { autoUpdater } = require('electron-updater');
+const log = require('electron-log');
+
+log.transports.file.level = 'info';
+autoUpdater.logger = log;
+// ignore certificate
+autoUpdater.verfifyUpdateCodeSignature = false;
+
 let mainWin;
 let readerWindow;
 let urlWindow;
@@ -46,6 +55,7 @@ let options = {
 };
 const os = require('os');
 const Database = require("better-sqlite3");
+const { info } = require("console");
 if (os.platform() === 'linux') {
   options = Object.assign({}, options, {
     icon: path.join(__dirname, "./build/assets/icon.png"),
@@ -590,10 +600,51 @@ const createMainWin = () => {
     event.returnValue = filePath;
     filePath = null;
   });
+  autoUpdater.checkForUpdatesAndNotify();
 };
 app.on("ready", () => {
   createMainWin();
 });
+// auto-update
+autoUpdater.on('update-available', () => {
+  log.info('Update available', info);
+  if (mainWin) {
+    mainWin.webContents.send('update-available', info);
+  }
+});
+autoUpdater.on('update-not-available', () => {
+  log.info('Update not available:', info);
+});
+autoUpdater.on('error', (err) => {
+  log.error('Error in auto-updater:', err);
+  if (mainWin) {
+    mainWin.webContents.send('update-error', err.message);
+  }
+});
+autoUpdater.on('download-progress', (progressObj) => {
+  log.info(`Download progress: ${progressObj.percent}%`);
+  if (mainWin) {
+    mainWin.webContents.send('download-progress', progressObj);
+  }
+});
+autoUpdater.on('update-downloaded', (info) => {
+  log.info('Update downloaded');
+  if (mainWin) {
+    mainWin.webContents.send('update-downloaded', info);
+  }
+});
+ipcMain.handle('check-for-updates', () => {
+  autoUpdater.checkForUpdates();
+});
+ipcMain.handle('quit-and-install', () => {
+  autoUpdater.quitAndInstall(false, true);
+});
+
+// Check for updates every minute
+setInterval(() => {
+  autoUpdater.checkForUpdates();
+}, 60000);
+
 app.on("window-all-closed", () => {
   app.quit();
 });

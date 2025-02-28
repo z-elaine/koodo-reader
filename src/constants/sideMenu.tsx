@@ -11,7 +11,7 @@ export const sideMenu = [
   },
 
   {
-    name: "Notes",
+    name: "NODES",
     icon: "idea-line",
     mode: "note",
   },
